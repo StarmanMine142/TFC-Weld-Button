@@ -1,37 +1,37 @@
 package com.hermitowo.tfcweldbutton.network;
 
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
+import java.util.function.Consumer;
 import com.hermitowo.tfcweldbutton.TFCWeldButton;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
-import org.apache.commons.lang3.mutable.MutableInt;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadHandler;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public class PacketHandler
 {
-    private static final String VERSION = ModList.get().getModFileById(TFCWeldButton.MOD_ID).versionString();
-    private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(new ResourceLocation(TFCWeldButton.MOD_ID, "network"), () -> VERSION, VERSION::equals, VERSION::equals);
-    private static final MutableInt ID = new MutableInt(0);
-
-    public static void send(PacketDistributor.PacketTarget target, Object message)
+    public static <T extends CustomPacketPayload> CustomPacketPayload.Type<T> type(String id)
     {
-        CHANNEL.send(target, message);
+        return new CustomPacketPayload.Type<T>(ResourceLocation.fromNamespaceAndPath(TFCWeldButton.MOD_ID, id));
     }
 
-    public static void init()
+    public static void setup(RegisterPayloadHandlersEvent event)
     {
-        register(WeldButtonPacket.class, WeldButtonPacket::new, WeldButtonPacket::handle);
+        final PayloadRegistrar register = event.registrar(ModList.get().getModFileById(TFCWeldButton.MOD_ID).versionString());
+
+        register.playToServer(WeldButtonPacket.TYPE, WeldButtonPacket.CODEC, onServer(WeldButtonPacket::handle));
     }
 
-    private static <T> void register(Class<T> cls, Supplier<T> factory, BiConsumer<T, ServerPlayer> handler)
+    private static <T extends CustomPacketPayload> IPayloadHandler<T> onClient(Consumer<T> handler)
     {
-        CHANNEL.registerMessage(ID.getAndIncrement(), cls, (packet, buffer) -> {}, buffer -> factory.get(), (packet, context) -> {
-            context.get().setPacketHandled(true);
-            context.get().enqueueWork(() -> handler.accept(packet, context.get().getSender()));
-        });
+        return (payload, context) -> context.enqueueWork(() -> handler.accept(payload));
+    }
+
+    private static <T extends CustomPacketPayload> IPayloadHandler<T> onServer(BiConsumer<T, ServerPlayer> handler)
+    {
+        return (payload, context) -> context.enqueueWork(() -> handler.accept(payload, (ServerPlayer) context.player()));
     }
 }

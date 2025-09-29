@@ -1,15 +1,16 @@
 package com.hermitowo.tfcweldbutton;
 
 import com.hermitowo.tfcweldbutton.network.PacketHandler;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
 
 @Mod(TFCWeldButton.MOD_ID)
 public class TFCWeldButton
 {
     public static final String MOD_ID = "tfcweldbutton";
 
-    public TFCWeldButton()
+    public TFCWeldButton(IEventBus bus)
     {
-        PacketHandler.init();
+        bus.addListener(PacketHandler::setup);
     }
 }
